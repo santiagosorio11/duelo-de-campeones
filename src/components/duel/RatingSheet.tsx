@@ -1,9 +1,10 @@
 "use client";
 
-import { WarningCircleIcon, XIcon } from "@phosphor-icons/react";
+import { WarningCircleIcon } from "@phosphor-icons/react";
 import clsx from "clsx";
-import { useEffect, useId, useRef, useState, useTransition, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { useId, useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { submitRating, type PublicParticipant, type SubmitRatingResult } from "@/app/actions";
+import { BottomSheet, useSheetClose } from "@/components/ui/BottomSheet";
 import { gsap, prefersReducedMotion, useGSAP } from "@/lib/gsap";
 import { raffleMessage, type Dish, type Passport, type Restaurant } from "@/lib/passport";
 import { formatNationalMobile, looksLikeColombianMobile, toNationalDigits } from "@/lib/phone-format";
@@ -36,109 +37,43 @@ const FIELD_FOR_CODE: Partial<Record<string, keyof Errors>> = {
   consent_required: "consent",
 };
 
-/** Hoja inferior para calificar un plato. Usa <dialog> nativo (foco, Escape, fondo inerte). */
+/** Hoja inferior para calificar un plato. */
 export function RatingSheet(props: Props) {
   const { dish, restaurant, catalog, identity, passport, onClose } = props;
-  const dialog = useRef<HTMLDialogElement>(null);
-  const panel = useRef<HTMLDivElement>(null);
-  const backdrop = useRef<HTMLDivElement>(null);
-  const closing = useRef(false);
   const [result, setResult] = useState<RatedResult | null>(null);
-
-  const { contextSafe } = useGSAP(
-    () => {
-      const el = dialog.current;
-      if (!el) return;
-      if (!el.open) el.showModal();
-      if (prefersReducedMotion()) return;
-      gsap.fromTo(backdrop.current, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 });
-      gsap.fromTo(panel.current, { yPercent: 100 }, { yPercent: 0, duration: 0.55, ease: "expo.out" });
-    },
-    { scope: dialog },
-  );
-
-  useEffect(() => {
-    const html = document.documentElement;
-    const previous = html.style.overflow;
-    html.style.overflow = "hidden";
-    return () => {
-      html.style.overflow = previous;
-    };
-  }, []);
-
-  const requestClose = () => {
-    if (closing.current) return;
-    closing.current = true;
-    const done = () => {
-      dialog.current?.close();
-      onClose();
-    };
-    if (prefersReducedMotion()) {
-      done();
-      return;
-    }
-    contextSafe(() => {
-      gsap
-        .timeline({ onComplete: done })
-        .to(panel.current, { yPercent: 100, duration: 0.35, ease: "power3.in" })
-        .to(backdrop.current, { autoAlpha: 0, duration: 0.3 }, 0);
-    })();
-  };
 
   const alreadyStamped = identity ? passport?.stamps[dish.slug] : undefined;
   const view = result ? "done" : alreadyStamped ? "already" : "form";
+  const shownPassport = result?.passport ?? passport;
 
   return (
-    <dialog
-      ref={dialog}
-      aria-labelledby="sheet-title"
-      onCancel={(event) => {
-        event.preventDefault();
-        requestClose();
-      }}
-      style={{ "--team": restaurant.accentColor } as CSSProperties}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none overflow-hidden bg-transparent p-0 text-bone backdrop:bg-transparent"
-    >
-      <div ref={backdrop} className="absolute inset-0 bg-ink-950/75 backdrop-blur-sm" onClick={requestClose} />
+    <BottomSheet labelledBy="sheet-title" onClose={onClose}>
+      <header className="px-5 pt-1">
+        <p className="text-sm text-mist">{restaurant.name}</p>
+        <h2 id="sheet-title" className="font-display text-[40px] leading-[0.92] uppercase">
+          {dish.name}
+        </h2>
+      </header>
 
-      <div
-        ref={panel}
-        className="absolute inset-x-0 bottom-0 mx-auto max-h-[92dvh] w-full max-w-[520px] overflow-y-auto overscroll-contain rounded-t-[24px] border border-b-0 border-white/10 bg-ink-900 pb-[max(24px,env(safe-area-inset-bottom))] shadow-[0_-24px_80px_rgb(0_0_0/0.6)]"
-      >
-        <div className="sticky top-0 z-10 flex items-center justify-between bg-ink-900/90 px-5 pt-3 pb-2 backdrop-blur">
-          <span aria-hidden className="mx-auto h-1 w-10 rounded-full bg-white/15" />
-          <button
-            type="button"
-            onClick={requestClose}
-            aria-label="Cerrar"
-            className="absolute top-2 right-3 grid size-10 place-items-center rounded-full text-mist transition hover:bg-white/5 hover:text-bone active:scale-95"
-          >
-            <XIcon size={20} aria-hidden />
-          </button>
-        </div>
-
-        <header className="px-5 pt-1">
-          <p className="text-sm text-mist">{restaurant.name}</p>
-          <h2 id="sheet-title" className="font-display text-[40px] leading-[0.92] uppercase">
-            {dish.name}
-          </h2>
-        </header>
-
-        {view === "form" ? (
-          <RatingForm {...props} onSuccess={(res) => { setResult(res); props.onRated(res); }} />
-        ) : (
-          <StampView
-            dish={dish}
-            catalog={catalog}
-            passport={result?.passport ?? passport}
-            status={result?.status ?? "already_rated"}
-            stars={(result?.passport ?? passport)?.stamps[dish.slug] ?? 0}
-            onDone={requestClose}
-            onOtherPerson={view === "already" ? props.onForget : undefined}
-          />
-        )}
-      </div>
-    </dialog>
+      {view === "form" ? (
+        <RatingForm
+          {...props}
+          onSuccess={(res) => {
+            setResult(res);
+            props.onRated(res);
+          }}
+        />
+      ) : (
+        <StampView
+          dish={dish}
+          catalog={catalog}
+          passport={shownPassport}
+          status={result?.status ?? "already_rated"}
+          stars={shownPassport?.stamps[dish.slug] ?? 0}
+          onOtherPerson={view === "already" ? props.onForget : undefined}
+        />
+      )}
+    </BottomSheet>
   );
 }
 
@@ -197,7 +132,7 @@ function RatingForm({
     <form onSubmit={handleSubmit} noValidate className="space-y-6 px-5 pt-6">
       <fieldset>
         <legend id={`${ids}-stars`} className="mb-3 w-full text-center text-sm font-medium text-bone/90">
-          ¿Qué tal estuvo?
+          Tu veredicto, juez: ¿qué tal estuvo?
         </legend>
         <StarRating value={stars} onChange={setStars} labelledBy={`${ids}-stars`} error={errors.stars} />
       </fieldset>
@@ -228,12 +163,7 @@ function RatingForm({
             />
           </Field>
 
-          <Field
-            id={`${ids}-phone`}
-            label="Celular"
-            helper="Si ganas, te llamamos a este número."
-            error={errors.phone}
-          >
+          <Field id={`${ids}-phone`} label="Celular" helper="Si ganas, te llamamos a este número." error={errors.phone}>
             <div
               className={clsx(
                 "flex h-12 items-stretch overflow-hidden rounded-[14px] border bg-ink-850 transition focus-within:border-gold-400/70 focus-within:ring-2 focus-within:ring-gold-400/25",
@@ -352,7 +282,6 @@ function StampView({
   passport,
   status,
   stars,
-  onDone,
   onOtherPerson,
 }: {
   dish: Dish;
@@ -360,25 +289,25 @@ function StampView({
   passport: Passport | null;
   status: "created" | "already_rated";
   stars: number;
-  onDone: () => void;
   onOtherPerson?: () => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
+  const close = useSheetClose();
 
   useGSAP(
     () => {
       if (prefersReducedMotion() || status !== "created") return;
       gsap
         .timeline()
-        .fromTo(".stamp", { scale: 1.9, rotation: -32, autoAlpha: 0 }, { scale: 1, rotation: -8, autoAlpha: 1, duration: 0.55, ease: "slam" })
+        .fromTo(".stamp", { scale: 1.9, rotation: -32, autoAlpha: 0 }, { scale: 1, rotation: -8, autoAlpha: 1, duration: 0.6, ease: "slam" })
         .fromTo(
           ".stamp-ring",
           { scale: 0.8, autoAlpha: 0.8 },
-          { scale: 1.9, autoAlpha: 0, duration: 0.7, ease: "power2.out", immediateRender: false },
-          0.3,
+          { scale: 1.9, autoAlpha: 0, duration: 0.8, ease: "power2.out", immediateRender: false },
+          0.32,
         )
-        .from(".stamp-copy > *", { y: 16, autoAlpha: 0, duration: 0.5, stagger: 0.06, ease: "expo.out" }, 0.35)
-        .fromTo("[data-stamp=new]", { scale: 0.4 }, { scale: 1, duration: 0.5, ease: "back.out(3)" }, 0.6);
+        .from(".stamp-copy > *", { y: 16, autoAlpha: 0, duration: 0.55, stagger: 0.07, ease: "expo.out" }, 0.4)
+        .fromTo("[data-stamp=new]", { scale: 0.4 }, { scale: 1, duration: 0.55, ease: "back.out(3)" }, 0.7);
     },
     { scope: root },
   );
@@ -391,7 +320,7 @@ function StampView({
         <span aria-hidden className="stamp-ring absolute inset-0 rounded-full border-2 border-gold-300/70 opacity-0" />
         <div
           style={{ transform: "rotate(-8deg)" }}
-          className="stamp grid size-28 place-items-center rounded-full bg-[color-mix(in_oklab,var(--team)_30%,var(--color-ink-900))] ring-[3px] ring-gold-400/80 ring-offset-4 ring-offset-ink-900"
+          className="stamp grid size-28 place-items-center rounded-full bg-ink-850 ring-[3px] ring-gold-400/80 ring-offset-4 ring-offset-ink-900"
         >
           <div className="flex flex-col items-center gap-1.5">
             <CategoryIcon category={dish.category} size={38} weight="fill" className="text-gold-300" aria-hidden />
@@ -400,7 +329,7 @@ function StampView({
         </div>
       </div>
 
-      <div className="stamp-copy flex flex-col items-center">
+      <div className="stamp-copy flex w-full flex-col items-center">
         <h3 className="font-display mt-6 text-[40px] leading-none uppercase">{created ? "¡Sellado!" : "Ya estaba sellado"}</h3>
         <p className="mt-3 max-w-[36ch] text-sm leading-relaxed text-mist">
           {created
@@ -414,7 +343,7 @@ function StampView({
 
       <button
         type="button"
-        onClick={onDone}
+        onClick={close}
         className="mt-6 w-full rounded-full bg-gold-400 py-4 text-base font-semibold text-ink-950 transition active:scale-[0.99]"
       >
         Listo

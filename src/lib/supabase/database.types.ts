@@ -23,6 +23,7 @@ export type Database = {
           results_published: boolean
           starts_at: string | null
           updated_at: string
+          winners_per_restaurant: number
         }
         Insert: {
           ends_at?: string | null
@@ -32,6 +33,7 @@ export type Database = {
           results_published?: boolean
           starts_at?: string | null
           updated_at?: string
+          winners_per_restaurant?: number
         }
         Update: {
           ends_at?: string | null
@@ -41,6 +43,7 @@ export type Database = {
           results_published?: boolean
           starts_at?: string | null
           updated_at?: string
+          winners_per_restaurant?: number
         }
         Relationships: []
       }

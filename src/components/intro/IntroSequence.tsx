@@ -1,39 +1,51 @@
 "use client";
 
-import { useRef, type CSSProperties, type RefObject } from "react";
-import { VsBadge } from "@/components/brand/VsBadge";
+import { useRef, type RefObject } from "react";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { gsap, prefersReducedMotion, SplitText, useGSAP } from "@/lib/gsap";
 
 const SEEN_KEY = "dc:intro-seen";
-const SPARKS = 10;
-const TAB_RADIUS = 24;
+const SPARKS = 12;
+
+/** Líneas de velocidad: posición vertical (%), ancho (vw) y grosor (px). */
+const STREAKS = [
+  [11, 42, 1],
+  [18, 60, 2],
+  [26, 35, 1],
+  [33, 55, 1],
+  [41, 70, 2],
+  [52, 45, 1],
+  [60, 65, 2],
+  [67, 38, 1],
+  [76, 58, 1],
+  [85, 48, 2],
+] as const;
+
+const BEATS = [
+  { number: "2", word: "Restaurantes" },
+  { number: "4", word: "Platos" },
+  { number: "1", word: "Campeón" },
+];
 
 export type IntroTargets = {
-  /** Contenedor de la interfaz real que aparece al final. */
+  /** Contenedor de la interfaz (oculto mientras arranca la intro). */
   app: RefObject<HTMLElement | null>;
-  wordmark: RefObject<HTMLElement | null>;
-  vs: RefObject<HTMLElement | null>;
-  /** Contenedor de las pestañas: cada pestaña lleva el atributo data-tab. */
-  tabs: RefObject<HTMLElement | null>;
+  /** Arena de contrincantes: la intro termina animando sus piezas reales. */
+  arena: RefObject<HTMLElement | null>;
 };
 
-type IntroRestaurant = { slug: string; name: string; accentColor: string };
-
 type Props = {
-  restaurants: IntroRestaurant[];
-  activeIndex: number;
   targets: IntroTargets;
-  /** La interfaz ya es visible y se puede tocar (la intro sigue terminando encima). */
+  /** La arena ya se puede tocar (la intro sigue terminando encima). */
   onReveal: () => void;
   /** La intro terminó y se puede desmontar. */
   onDone: () => void;
 };
 
-type Fit = { x: number; y: number; scaleX: number; scaleY: number };
+type Fit = { x: number; y: number; scale: number };
 
-/** Transformación que lleva `el` al lugar y tamaño de `target` (centro a centro). */
-function fitTo(el: Element | undefined, target: Element | null | undefined): Fit | null {
+/** Transformación que lleva `el` al lugar y tamaño de `target` (escala uniforme). */
+function fitTo(el: Element | undefined, target: Element | undefined): Fit | null {
   if (!el || !target) return null;
   const a = el.getBoundingClientRect();
   const b = target.getBoundingClientRect();
@@ -41,8 +53,7 @@ function fitTo(el: Element | undefined, target: Element | null | undefined): Fit
   return {
     x: b.left + b.width / 2 - (a.left + a.width / 2),
     y: b.top + b.height / 2 - (a.top + a.height / 2),
-    scaleX: b.width / a.width,
-    scaleY: b.height / a.height,
+    scale: b.height / a.height,
   };
 }
 
@@ -63,11 +74,12 @@ function wasSeen(): boolean {
 }
 
 /**
- * Motion graphic de entrada: dos filos chocan, cae el título, se abren los
- * rincones de cada restaurante, entra el VS y todo encaja en la interfaz real
- * de votación (título → header, rincones → pestañas, VS → emblema central).
+ * Motion graphic de entrada al estilo de una noche de pelea:
+ * promo "2 restaurantes, 4 platos, 1 campeón" → cae el título → se encienden
+ * las luces → cada esquina entra a toda velocidad → cae el octágono del VS.
+ * El último cuadro ES la arena real, lista para elegir.
  */
-export function IntroSequence({ restaurants, activeIndex, targets, onReveal, onDone }: Props) {
+export function IntroSequence({ targets, onReveal, onDone }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const timeline = useRef<gsap.core.Timeline | null>(null);
   const revealed = useRef(false);
@@ -76,7 +88,6 @@ export function IntroSequence({ restaurants, activeIndex, targets, onReveal, onD
   const reveal = () => {
     if (revealed.current) return;
     revealed.current = true;
-    if (root.current) root.current.style.pointerEvents = "none";
     onReveal();
   };
 
@@ -91,169 +102,197 @@ export function IntroSequence({ restaurants, activeIndex, targets, onReveal, onD
   useGSAP(
     (_context, contextSafe) => {
       const el = root.current;
-      const app = targets.app.current;
-      if (!el || !app || !contextSafe) return;
+      if (!el || !contextSafe) return;
       const q = gsap.utils.selector(el);
 
       window.scrollTo(0, 0);
 
-      if (prefersReducedMotion()) {
-        timeline.current = gsap
-          .timeline({ onComplete: finish })
-          .to(el, { autoAlpha: 0, duration: 0.3 })
-          .fromTo(app, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 }, 0);
-        return;
-      }
+      // Red de seguridad: pase lo que pase, la intro nunca deja la pantalla en negro.
+      const watchdog = window.setTimeout(() => {
+        if (!timeline.current) finish();
+      }, 4000);
 
       const build = contextSafe(() => {
         if (finished.current) return;
+        const app = targets.app.current;
+        const arena = targets.arena.current;
+        if (!app || !arena) {
+          finish();
+          return;
+        }
+
+        if (prefersReducedMotion()) {
+          timeline.current = gsap
+            .timeline({ onComplete: finish })
+            .to(el, { autoAlpha: 0, duration: 0.4 })
+            .fromTo(app, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, 0);
+          return;
+        }
+
         const full = !wasSeen();
-
+        const a = gsap.utils.selector(arena);
         const title = q(".intro-title")[0];
-        const vs = q(".intro-vs")[0];
-        const panels = q(".intro-panel");
-        const names = q(".intro-name");
-        const sparks = q(".intro-spark");
-        const tabs = Array.from(targets.tabs.current?.querySelectorAll("[data-tab]") ?? []);
-        const revealItems = app.querySelectorAll(".reveal-up");
-        const portrait = window.innerHeight >= window.innerWidth;
+        const shake = q(".intro-shake");
+        const streaks = q(".intro-streak");
+        const flash = q(".intro-flash");
+        const wordmark = a(".arena-wordmark");
+        const atmos = a(".arena-atmos");
+        const corners = a(".contender");
+        const names = a(".contender-name");
+        const details = a(".contender-tag, .contender-meta");
+        const vs = a(".arena-vs");
+        const seam = a(".arena-seam");
+        const chrome = a(".arena-chip, .arena-hint");
 
-        // 1. Medir todo antes de aplicar estados iniciales.
-        const titleFit = fitTo(title, targets.wordmark.current);
-        const vsFit = fitTo(vs, targets.vs.current);
-        const panelFits = panels.map((panel, i) => fitTo(panel, tabs[i]));
+        // 1. Medir antes de aplicar estados iniciales.
+        const titleFit = fitTo(title, wordmark[0]);
 
-        // 2. Estados iniciales.
+        // 2. Estados iniciales: la arena existe pero todas sus piezas empiezan fuera de escena.
         const top = SplitText.create(q(".intro-title [data-wm=top]"), { type: "chars", mask: "chars" });
         const mainLine = q(".intro-title [data-wm=main]")[0];
         const main = SplitText.create(mainLine, { type: "chars", charsClass: "wm-char" });
         mainLine?.classList.add("is-split");
 
-        const axis = portrait ? "scaleY" : "scaleX";
         gsap.set(q(".intro-stage"), { autoAlpha: 1 });
-        gsap.set(q(".intro-blade-a"), { xPercent: -50, yPercent: -50, rotation: 34, scaleX: 0, transformOrigin: "0% 50%" });
-        gsap.set(q(".intro-blade-b"), { xPercent: -50, yPercent: -50, rotation: -34, scaleX: 0, transformOrigin: "100% 50%" });
-        gsap.set(q(".intro-flash"), { autoAlpha: 0 });
-        gsap.set(panels, {
-          [axis]: 0,
-          transformOrigin: (i: number) =>
-            portrait ? (i === 0 ? "50% 100%" : "50% 0%") : i === 0 ? "100% 50%" : "0% 50%",
-          borderRadius: "0px / 0px",
-        });
-        gsap.set(names, { autoAlpha: 0, x: (i: number) => (i === 0 ? -48 : 48) });
-        gsap.set(vs, { scale: 0, rotation: -35 });
+        gsap.set(q(".promo-beat"), { autoAlpha: 0 });
+        gsap.set(streaks, { x: "-80vw" });
+        gsap.set(flash, { autoAlpha: 0 });
         gsap.set(q(".intro-ring"), { xPercent: -50, yPercent: -50, autoAlpha: 0 });
-        gsap.set(sparks, { xPercent: -50, yPercent: -50, autoAlpha: 0, rotation: (i: number) => i * (360 / SPARKS) + 90 });
+        gsap.set(q(".intro-spark"), { xPercent: -50, yPercent: -50, autoAlpha: 0, rotation: (i: number) => i * (360 / SPARKS) + 90 });
+
+        gsap.set(app, { autoAlpha: 1 });
+        gsap.set([wordmark, atmos, chrome], { autoAlpha: 0 });
+        gsap.set(corners, { xPercent: (i: number) => (i === 0 ? -100 : 100) });
+        gsap.set(names, { autoAlpha: 0, x: (i: number) => (i === 0 ? -0.5 : 0.5) * window.innerWidth, skewX: (i: number) => (i === 0 ? -18 : 18) });
+        gsap.set(details, { autoAlpha: 0, y: 14 });
+        gsap.set(vs, { autoAlpha: 0, scale: 3.2, rotation: -25 });
+        gsap.set(seam, { scale: 0, transformOrigin: "50% 50%" });
 
         const tl = gsap.timeline({ onComplete: finish, defaults: { ease: "power3.out" } });
         timeline.current = tl;
+        if (process.env.NODE_ENV !== "production") {
+          // Solo en desarrollo: permite pausar la intro desde la consola para revisarla.
+          (window as unknown as { __introTimeline?: gsap.core.Timeline }).__introTimeline = tl;
+        }
+
+        const rush = (at: string | number, duration = 0.5) =>
+          tl.fromTo(
+            streaks,
+            { x: "-80vw", autoAlpha: 1 },
+            { x: "180vw", autoAlpha: 0.8, duration, stagger: 0.015, ease: "power2.in", immediateRender: false },
+            at,
+          );
+        const hit = (at: string | number, strength = 1) =>
+          tl.to(shake, {
+            keyframes: { x: [0, -9 * strength, 7 * strength, -4 * strength, 0], y: [0, 5 * strength, -4 * strength, 2 * strength, 0] },
+            duration: 0.32,
+            ease: "none",
+          }, at);
+        const blink = (at: string | number, peak: number) =>
+          tl.to(flash, { keyframes: [{ autoAlpha: peak, duration: 0.05 }, { autoAlpha: 0, duration: 0.5, ease: "power2.out" }] }, at);
 
         if (full) {
-          tl.to(q(".intro-skip"), { autoAlpha: 1, duration: 0.4 }, 0.6)
-            .addLabel("clash", 0.3)
-            .to(q(".intro-blade-a"), { scaleX: 1, duration: 0.42, ease: "power4.in" }, "clash")
-            .to(q(".intro-blade-b"), { scaleX: 1, duration: 0.42, ease: "power4.in" }, "clash+=0.08")
-            .addLabel("impact", "clash+=0.46")
-            .to(q(".intro-flash"), {
-              keyframes: [
-                { autoAlpha: 0.85, duration: 0.05 },
-                { autoAlpha: 0, duration: 0.5, ease: "power2.out" },
-              ],
-            }, "impact")
-            .to(q(".intro-shake"), {
-              keyframes: { x: [0, -12, 9, -6, 3, 0], y: [0, 7, -6, 4, -2, 0] },
-              duration: 0.45,
-              ease: "none",
-            }, "impact")
-            .to(q(".intro-blade"), { autoAlpha: 0, duration: 0.6 }, "impact+=0.2")
-            .from(top.chars, { yPercent: 115, duration: 0.7, stagger: 0.04, ease: "power4.out" }, "impact+=0.05")
+          tl.to(q(".intro-skip"), { autoAlpha: 1, duration: 0.5 }, 0.6);
+
+          // Promo: 2 restaurantes, 4 platos, 1 campeón.
+          const beats = q(".promo-beat");
+          const beatAt = [0.5, 1.35, 2.2];
+          beats.forEach((beat, i) => {
+            const label = `beat${i}`;
+            const side = i % 2 === 0 ? 1 : -1;
+            tl.addLabel(label, beatAt[i]);
+            tl.fromTo(
+              beat,
+              { autoAlpha: 0, scale: 1.9, x: 80 * side, skewX: -14 * side },
+              { autoAlpha: 1, scale: 1, x: 0, skewX: 0, duration: 0.42, ease: "power4.out", immediateRender: false },
+              label,
+            );
+            rush(label);
+            hit(`${label}+=0.1`, 0.8);
+            if (i < beats.length - 1) {
+              tl.to(beat, { autoAlpha: 0, x: -110 * side, skewX: 14 * side, duration: 0.28, ease: "power3.in" }, `${label}+=0.62`);
+            } else {
+              tl.to(beat, { autoAlpha: 0, scale: 0.8, duration: 0.3, ease: "power2.in" }, `${label}+=0.95`);
+            }
+          });
+
+          // Cae el título.
+          tl.addLabel("title", "beat2+=1.2");
+          blink("title", 0.5);
+          hit("title", 1.2);
+          tl.from(top.chars, { yPercent: 115, duration: 0.8, stagger: 0.05, ease: "power4.out" }, "title+=0.05")
             .from(main.chars, {
               autoAlpha: 0,
-              scale: 2.6,
-              yPercent: -25,
-              duration: 0.6,
-              stagger: { each: 0.045, from: "center" },
+              scale: 2.4,
+              yPercent: -20,
+              duration: 0.7,
+              stagger: { each: 0.06, from: "center" },
               ease: "slam",
-            }, "impact+=0.18")
-            .fromTo(q(".intro-shine"), { xPercent: -130, skewX: -12 }, { xPercent: 130, skewX: -12, duration: 1, ease: "power2.inOut" }, "impact+=0.75")
-            .addLabel("doors", "impact+=1.3");
-
-          if (titleFit) {
-            tl.to(title, { x: titleFit.x, y: titleFit.y, scale: titleFit.scaleY, duration: 0.85, ease: "power4.inOut" }, "doors");
-          }
-
-          tl.to(panels, { scaleX: 1, scaleY: 1, duration: 0.8, ease: "expo.out", stagger: 0.06 }, "doors+=0.2")
-            .to(names, { autoAlpha: 1, x: 0, duration: 0.7, stagger: 0.08 }, "doors+=0.4")
-            .addLabel("versus", "doors+=0.7")
-            .to(vs, { scale: 1, rotation: 0, duration: 0.7, ease: "back.out(2.4)" }, "versus")
-            .fromTo(
-              q(".intro-ring"),
-              { autoAlpha: 0.9, scale: 0.35 },
-              { autoAlpha: 0, scale: 2.8, duration: 0.85, ease: "power2.out", immediateRender: false },
-              "versus+=0.06",
-            )
-            .fromTo(
-              sparks,
-              { autoAlpha: 1, x: 0, y: 0, scale: 1 },
-              {
-                autoAlpha: 0,
-                scale: 0.3,
-                x: (i: number) => Math.cos((i * 2 * Math.PI) / SPARKS) * (i % 2 ? 150 : 115),
-                y: (i: number) => Math.sin((i * 2 * Math.PI) / SPARKS) * (i % 2 ? 150 : 115),
-                duration: 0.75,
-                ease: "power3.out",
-                immediateRender: false,
-              },
-              "versus+=0.06",
-            )
-            .to(q(".intro-shake"), { keyframes: { x: [0, 6, -4, 2, 0] }, duration: 0.3, ease: "none" }, "versus+=0.04")
-            .addLabel("land", "versus+=0.95");
+            }, "title+=0.1")
+            .addLabel("fly", "title+=1.9");
         } else {
           // Versión corta para quien ya la vio en esta sesión.
-          gsap.set([...panels, vs], { autoAlpha: 0 });
-          tl.from(main.chars, { autoAlpha: 0, scale: 2, duration: 0.45, stagger: { each: 0.03, from: "center" }, ease: "slam" }, 0.05)
-            .from(top.chars, { yPercent: 115, duration: 0.5, stagger: 0.03, ease: "power4.out" }, 0.1)
-            .addLabel("land", 0.55);
-          if (titleFit) {
-            tl.to(title, { x: titleFit.x, y: titleFit.y, scale: titleFit.scaleY, duration: 0.7, ease: "power4.inOut" }, "land");
-          }
+          tl.from(main.chars, { autoAlpha: 0, scale: 2, duration: 0.45, stagger: { each: 0.03, from: "center" }, ease: "slam" }, 0.1)
+            .from(top.chars, { yPercent: 115, duration: 0.45, stagger: 0.03, ease: "power4.out" }, 0.15)
+            .addLabel("fly", 0.75);
         }
 
-        // 3. Aterrizaje: cada pieza encaja en su lugar de la interfaz real.
-        tl.to(names, { autoAlpha: 0, duration: 0.25 }, "land").set(panels, { transformOrigin: "50% 50%" }, "land");
+        const pace = full ? 1 : 0.7;
+        const at = (offset: number) => `fly+=${(offset * pace).toFixed(3)}`;
 
-        panels.forEach((panel, i) => {
-          const fit = panelFits[i];
-          if (!fit) return;
-          tl.to(panel, {
-            x: fit.x,
-            y: fit.y,
-            scaleX: fit.scaleX,
-            scaleY: fit.scaleY,
-            borderRadius: `${TAB_RADIUS / fit.scaleX}px / ${TAB_RADIUS / fit.scaleY}px`,
-            opacity: i === activeIndex ? 1 : 0.55,
+        // El título sube al header, se encienden las luces y entran las esquinas.
+        if (titleFit) {
+          tl.to(title, { x: titleFit.x, y: titleFit.y, scale: titleFit.scale, duration: 1 * pace, ease: "power3.inOut" }, "fly");
+        }
+        tl.to(q(".intro-bg"), { autoAlpha: 0, duration: 0.5 }, at(0.05))
+          .to(atmos, { keyframes: [{ autoAlpha: 0.9, duration: 0.08 }, { autoAlpha: 0.25, duration: 0.1 }, { autoAlpha: 1, duration: 0.4 }] }, at(0.1))
+          .to(corners, { xPercent: 0, duration: 0.75 * pace, ease: "power4.out", stagger: 0.12 }, at(0.3));
+        rush(at(0.3), 0.45);
+        tl.to(names, { autoAlpha: 1, x: 0, skewX: 0, duration: 0.9 * pace, ease: "expo.out", stagger: 0.12 }, at(0.45))
+          .set(wordmark, { autoAlpha: 1 }, at(1))
+          .set(title, { autoAlpha: 0 }, at(1))
+          // Cae el octágono del VS.
+          .addLabel("versus", at(1.1))
+          .to(vs, { autoAlpha: 1, scale: 1, rotation: 0, duration: 0.55, ease: "slam" }, "versus")
+          .to(seam, { scale: 1, duration: 0.6, ease: "power3.out" }, "versus+=0.05")
+          .to(q(".intro-skip"), { autoAlpha: 0, duration: 0.3 }, "versus");
+        blink("versus+=0.1", full ? 0.35 : 0.2);
+        hit("versus+=0.08", full ? 1.3 : 0.7);
+
+        tl.fromTo(
+          q(".intro-ring"),
+          { autoAlpha: 0.9, scale: 0.4 },
+          { autoAlpha: 0, scale: 3.2, duration: 0.85, ease: "power2.out", immediateRender: false },
+          "versus+=0.1",
+        ).fromTo(
+          q(".intro-spark"),
+          { autoAlpha: 1, x: 0, y: 0, scale: 1 },
+          {
+            autoAlpha: 0,
+            scale: 0.3,
+            x: (i: number) => Math.cos((i * 2 * Math.PI) / SPARKS) * (i % 2 ? 170 : 125),
+            y: (i: number) => Math.sin((i * 2 * Math.PI) / SPARKS) * (i % 2 ? 170 : 125),
             duration: 0.8,
-            ease: "power4.inOut",
-          }, "land");
-        });
+            ease: "power3.out",
+            immediateRender: false,
+          },
+          "versus+=0.1",
+        );
 
-        if (vsFit) {
-          tl.to(vs, { x: vsFit.x, y: vsFit.y, scale: vsFit.scaleY, rotation: 0, duration: 0.8, ease: "power4.inOut" }, "land");
-        }
-
-        tl.to(q(".intro-skip"), { autoAlpha: 0, duration: 0.2 }, "land")
-          .to(q(".intro-bg"), { autoAlpha: 0, duration: 0.6 }, "land+=0.2")
-          .fromTo(app, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.4 }, "land+=0.55")
-          .call(reveal, undefined, "land+=0.6")
-          .to([title, vs, ...panels], { autoAlpha: 0, duration: 0.3 }, "land+=0.85");
-
-        if (revealItems.length) {
-          tl.from(revealItems, { y: 36, autoAlpha: 0, duration: 0.8, stagger: 0.07, ease: "expo.out" }, "land+=0.6");
-        }
+        tl.to(details, { autoAlpha: 1, y: 0, duration: 0.7, stagger: 0.08, ease: "expo.out" }, "versus+=0.4")
+          .to(chrome, { autoAlpha: 1, duration: 0.6, stagger: 0.1 }, "versus+=0.55")
+          .call(reveal, undefined, "versus+=0.35");
       });
 
       // Medimos con la tipografía final ya cargada para que el encaje sea exacto.
-      document.fonts.ready.then(build);
+      document.fonts.ready
+        .then(build)
+        .catch((error: unknown) => {
+          console.error("Intro:", error);
+          finish();
+        });
+
+      return () => window.clearTimeout(watchdog);
     },
     { scope: root },
   );
@@ -263,10 +302,8 @@ export function IntroSequence({ restaurants, activeIndex, targets, onReveal, onD
     else finish();
   };
 
-  const [first, second] = restaurants;
-
   return (
-    <div ref={root} className="fixed inset-0 z-[70] overflow-hidden">
+    <div ref={root} className="pointer-events-none fixed inset-0 z-[70] overflow-hidden">
       <div className="intro-bg absolute inset-0 bg-ink-950">
         <div
           aria-hidden
@@ -276,54 +313,48 @@ export function IntroSequence({ restaurants, activeIndex, targets, onReveal, onD
 
       <div aria-hidden className="intro-stage invisible absolute inset-0">
         <div className="intro-shake absolute inset-0">
-          {[first, second].map((restaurant, i) =>
-            restaurant ? (
-              <div
-                key={restaurant.slug}
-                style={{ "--team": restaurant.accentColor } as CSSProperties}
-                className={
-                  i === 0
-                    ? "intro-panel team-surface absolute inset-x-0 top-0 h-1/2 landscape:inset-y-0 landscape:right-auto landscape:h-auto landscape:w-1/2"
-                    : "intro-panel team-surface-mirror absolute inset-x-0 bottom-0 h-1/2 landscape:inset-y-0 landscape:left-auto landscape:h-auto landscape:w-1/2"
-                }
-              />
-            ) : null,
-          )}
+          {STREAKS.map(([top, width, height], i) => (
+            <span
+              key={i}
+              className="intro-streak absolute left-0 rounded-full bg-[linear-gradient(90deg,transparent,rgb(246_214_138/0.75),transparent)]"
+              style={{ top: `${top}%`, width: `${width}vw`, height }}
+            />
+          ))}
 
-          {first ? (
-            <p className="intro-name font-display absolute top-[14%] left-6 max-w-[80%] text-[clamp(52px,16vw,120px)] leading-[0.86] text-bone uppercase landscape:top-auto landscape:bottom-[18%] landscape:max-w-[42%] landscape:text-[clamp(48px,8vw,120px)]">
-              {first.name}
-            </p>
-          ) : null}
-          {second ? (
-            <p className="intro-name font-display absolute right-6 bottom-[14%] max-w-[80%] text-right text-[clamp(52px,16vw,120px)] leading-[0.86] text-bone uppercase landscape:top-[18%] landscape:bottom-auto landscape:max-w-[42%] landscape:text-[clamp(48px,8vw,120px)]">
-              {second.name}
-            </p>
-          ) : null}
-
-          <div className="intro-blade intro-blade-a absolute top-1/2 left-1/2 h-[2px] w-[150vmax] bg-[linear-gradient(90deg,transparent,var(--color-gold-300)_42%,#fff8e6_50%,var(--color-gold-300)_58%,transparent)]" />
-          <div className="intro-blade intro-blade-b absolute top-1/2 left-1/2 h-[2px] w-[150vmax] bg-[linear-gradient(90deg,transparent,var(--color-gold-300)_42%,#fff8e6_50%,var(--color-gold-300)_58%,transparent)]" />
+          <div className="absolute inset-0 text-[clamp(40px,12vw,110px)]">
+            {BEATS.map((beat) => (
+              <p key={beat.word} className="promo-beat font-display absolute inset-0 grid place-items-center text-center uppercase">
+                <span>
+                  <span className="text-gold block text-[2.4em] leading-[0.8]">{beat.number}</span>
+                  <span className="block leading-none tracking-[0.04em] text-bone">{beat.word}</span>
+                </span>
+              </p>
+            ))}
+          </div>
 
           <div className="absolute inset-0 grid place-items-center">
-            <div className="relative">
-              <div className="intro-title relative text-[clamp(64px,19vw,150px)]">
-                <Wordmark />
-                <div className="pointer-events-none absolute inset-0 overflow-hidden mix-blend-overlay">
-                  <div className="intro-shine absolute inset-y-0 w-1/3 bg-[linear-gradient(90deg,transparent,rgb(255_255_255/0.85),transparent)]" />
-                </div>
-              </div>
+            <div className="intro-title text-[clamp(60px,17vw,150px)]">
+              <Wordmark />
             </div>
           </div>
 
           <div className="absolute inset-0 grid place-items-center">
             <div className="relative">
-              <div className="intro-ring absolute top-1/2 left-1/2 size-[120px] rounded-full border-2 border-gold-300/70" />
+              <svg
+                className="intro-ring absolute top-1/2 left-1/2 size-[110px] text-gold-300/80"
+                viewBox="0 0 100 100"
+              >
+                <polygon
+                  points="29.3,0 70.7,0 100,29.3 100,70.7 70.7,100 29.3,100 0,70.7 0,29.3"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
               {Array.from({ length: SPARKS }, (_, i) => (
                 <span key={i} className="intro-spark absolute top-1/2 left-1/2 h-4 w-[3px] rounded-full bg-gold-300" />
               ))}
-              <div className="intro-vs text-[44px]">
-                <VsBadge />
-              </div>
             </div>
           </div>
         </div>
@@ -334,7 +365,7 @@ export function IntroSequence({ restaurants, activeIndex, targets, onReveal, onD
       <button
         type="button"
         onClick={skip}
-        className="intro-skip invisible absolute top-[max(16px,env(safe-area-inset-top))] right-4 rounded-full border border-white/15 bg-ink-900/70 px-4 py-2 text-sm text-bone/85 backdrop-blur transition active:scale-[0.97]"
+        className="intro-skip pointer-events-auto invisible absolute top-[max(16px,env(safe-area-inset-top))] right-4 rounded-full border border-white/15 bg-ink-900/70 px-4 py-2 text-sm text-bone/85 backdrop-blur transition active:scale-[0.97]"
       >
         Saltar intro
       </button>

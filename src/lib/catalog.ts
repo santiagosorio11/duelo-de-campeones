@@ -2,15 +2,17 @@ import "server-only";
 import { cache } from "react";
 import type { DishCategory, RatingRecord, Restaurant } from "@/lib/passport";
 import type { DishResult } from "@/lib/results";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { supabaseAdmin, withRetry } from "@/lib/supabase/server";
 
 export const getCatalog = cache(async (): Promise<Restaurant[]> => {
-  const { data, error } = await supabaseAdmin()
-    .from("restaurants")
-    .select(
-      "id, slug, name, tagline, accent_color, logo_path, sort_order, dishes(id, slug, name, category, description, image_path, sort_order, is_active)",
-    )
-    .order("sort_order");
+  const { data, error } = await withRetry(() =>
+    supabaseAdmin()
+      .from("restaurants")
+      .select(
+        "id, slug, name, tagline, accent_color, logo_path, sort_order, dishes(id, slug, name, category, description, image_path, sort_order, is_active)",
+      )
+      .order("sort_order"),
+  );
 
   if (error) throw new Error(`No se pudo cargar el catálogo: ${error.message}`);
 
@@ -45,7 +47,7 @@ export type CampaignState = {
 };
 
 export const getCampaign = cache(async (): Promise<CampaignState> => {
-  const { data, error } = await supabaseAdmin().from("campaign").select("*").eq("id", true).maybeSingle();
+  const { data, error } = await withRetry(() => supabaseAdmin().from("campaign").select("*").eq("id", true).maybeSingle());
   if (error) throw new Error(`No se pudo cargar la campaña: ${error.message}`);
 
   const now = Date.now();
@@ -62,11 +64,13 @@ export const getCampaign = cache(async (): Promise<CampaignState> => {
 });
 
 export async function getRatingsForPhone(phoneE164: string): Promise<RatingRecord[]> {
-  const { data, error } = await supabaseAdmin()
-    .from("participants")
-    .select("id, ratings(stars, dishes(slug))")
-    .eq("phone_e164", phoneE164)
-    .maybeSingle();
+  const { data, error } = await withRetry(() =>
+    supabaseAdmin()
+      .from("participants")
+      .select("id, ratings(stars, dishes(slug))")
+      .eq("phone_e164", phoneE164)
+      .maybeSingle(),
+  );
 
   if (error) throw new Error(`No se pudo cargar el pasaporte: ${error.message}`);
 
@@ -74,7 +78,7 @@ export async function getRatingsForPhone(phoneE164: string): Promise<RatingRecor
 }
 
 export async function getDishResults(): Promise<DishResult[]> {
-  const { data, error } = await supabaseAdmin().from("dish_results").select("*");
+  const { data, error } = await withRetry(() => supabaseAdmin().from("dish_results").select("*"));
   if (error) throw new Error(`No se pudieron cargar los resultados: ${error.message}`);
 
   return data.map((row) => ({

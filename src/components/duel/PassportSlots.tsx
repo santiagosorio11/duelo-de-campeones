@@ -1,7 +1,6 @@
 "use client";
 
 import clsx from "clsx";
-import type { CSSProperties } from "react";
 import type { Passport, Restaurant } from "@/lib/passport";
 import { CategoryIcon } from "./DishArt";
 import { StarRow } from "./StarRow";
@@ -22,11 +21,7 @@ export function PassportSlots({
   return (
     <div className="grid grid-cols-2 gap-3">
       {catalog.map((restaurant) => (
-        <div
-          key={restaurant.slug}
-          style={{ "--team": restaurant.accentColor } as CSSProperties}
-          className="rounded-[16px] border border-white/8 bg-white/[0.03] p-3"
-        >
+        <div key={restaurant.slug} className="rounded-[16px] border border-white/8 bg-white/[0.03] p-3">
           <p className="truncate text-xs font-medium text-bone/80">{restaurant.name}</p>
           <ul className="mt-3 flex justify-around gap-2">
             {restaurant.dishes.map((dish) => {
@@ -38,7 +33,7 @@ export function PassportSlots({
                     className={clsx(
                       "grid size-12 place-items-center rounded-full",
                       stars
-                        ? "-rotate-6 bg-[color-mix(in_oklab,var(--team)_32%,var(--color-ink-900))] text-gold-300 ring-2 ring-gold-400/70"
+                        ? "-rotate-6 bg-ink-850 text-gold-300 ring-2 ring-gold-400/70"
                         : "border-2 border-dashed border-white/15 text-white/25",
                     )}
                   >
