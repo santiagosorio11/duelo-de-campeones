@@ -22,6 +22,8 @@ export type RatingErrorCode =
   | "junk_phone"
   | "consent_required"
   | "not_remembered"
+  | "name_mismatch"
+  | "rate_limited"
   | "closed"
   | "invalid_dish"
   | "server_error";
@@ -36,9 +38,11 @@ const MESSAGES: Record<RatingErrorCode, string> = {
   invalid_input: "Revisa los datos e inténtalo de nuevo.",
   invalid_name: "Escribe tu nombre completo, solo con letras.",
   invalid_phone: "Escribe un celular colombiano válido de 10 dígitos.",
-  junk_phone: "Ese número no parece real. Usa tu celular: te llamaremos si ganas.",
+  junk_phone: "Ese número no parece real. Usa un celular válido: si ganas, te contactamos a ese número.",
   consent_required: "Debes autorizar el tratamiento de tus datos para participar.",
   not_remembered: "Vuelve a escribir tu nombre y celular.",
+  name_mismatch: "Este celular ya está registrado con otro nombre. Escribe el nombre con el que te registraste.",
+  rate_limited: "Demasiados intentos seguidos. Espera unos minutos e inténtalo de nuevo.",
   closed: "La votación está cerrada.",
   invalid_dish: "Ese plato no está en competencia.",
   server_error: "No pudimos guardar tu calificación. Inténtalo de nuevo.",
@@ -83,10 +87,13 @@ export async function submitRating(input: unknown): Promise<SubmitRatingResult> 
     });
 
     if (error) {
-      console.error("submit_rating falló", error);
+      // Solo código y mensaje: el detalle de Postgres puede incluir datos personales.
+      console.error("submit_rating falló", { code: error.code, message: error.message });
       return fail("server_error");
     }
-    if (status === "closed" || status === "invalid_dish") return fail(status);
+    if (status === "closed" || status === "invalid_dish" || status === "name_mismatch" || status === "rate_limited") {
+      return fail(status);
+    }
     if (status !== "created" && status !== "already_rated") return fail("server_error");
 
     await writeParticipant(participant);
@@ -99,7 +106,7 @@ export async function submitRating(input: unknown): Promise<SubmitRatingResult> 
       participant: { name: participant.name, phoneMasked: maskPhone(participant.phone) },
     };
   } catch (error) {
-    console.error("submitRating", error);
+    console.error("submitRating", error instanceof Error ? error.message : "error desconocido");
     return fail("server_error");
   }
 }

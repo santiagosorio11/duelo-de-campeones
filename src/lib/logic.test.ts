@@ -1,38 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { pickWeighted, totalTickets } from "./raffle";
 import { leader, overallStandings, standingsForCategory, type DishResult } from "./results";
+import { siteUrl } from "./site";
 import { bogotaLocalToIso, isoToBogotaLocal } from "./time";
 import { nameSchema, ratingInputSchema } from "./validation";
 
-describe("pickWeighted", () => {
-  const pool = [
-    { id: "a", tickets: 2 },
-    { id: "b", tickets: 4 },
-    { id: "c", tickets: 3 },
-  ];
-
-  it("recorre los tickets en orden acumulado", () => {
-    expect(totalTickets(pool)).toBe(9);
-    expect(pickWeighted(pool, () => 0)?.id).toBe("a");
-    expect(pickWeighted(pool, () => 1)?.id).toBe("a");
-    expect(pickWeighted(pool, () => 2)?.id).toBe("b");
-    expect(pickWeighted(pool, () => 5)?.id).toBe("b");
-    expect(pickWeighted(pool, () => 6)?.id).toBe("c");
-    expect(pickWeighted(pool, () => 8)?.id).toBe("c");
+describe("siteUrl", () => {
+  it("usa NEXT_PUBLIC_SITE_URL cuando es válida", () => {
+    expect(siteUrl({ NEXT_PUBLIC_SITE_URL: "https://duelo.example.co" }).origin).toBe("https://duelo.example.co");
   });
 
-  it("devuelve null sin tickets", () => {
-    expect(pickWeighted([], () => 0)).toBeNull();
-    expect(pickWeighted([{ tickets: 0 }], () => 0)).toBeNull();
+  it("ignora un valor vacío o inválido (el error del build en Vercel)", () => {
+    expect(siteUrl({ NEXT_PUBLIC_SITE_URL: "", VERCEL_PROJECT_PRODUCTION_URL: "duelo.vercel.app" }).origin).toBe(
+      "https://duelo.vercel.app",
+    );
+    expect(siteUrl({ NEXT_PUBLIC_SITE_URL: "no es una url", VERCEL_URL: "duelo-abc.vercel.app" }).origin).toBe(
+      "https://duelo-abc.vercel.app",
+    );
+    expect(siteUrl({ NEXT_PUBLIC_SITE_URL: "javascript:alert(1)" }).origin).toBe("http://localhost:3000");
   });
 
-  it("reparte según el peso", () => {
-    const counts = { a: 0, b: 0, c: 0 };
-    for (let ticket = 0; ticket < 9; ticket++) {
-      const winner = pickWeighted(pool, () => ticket);
-      if (winner) counts[winner.id as keyof typeof counts]++;
-    }
-    expect(counts).toEqual({ a: 2, b: 4, c: 3 });
+  it("cae en localhost sin configuración", () => {
+    expect(siteUrl({}).origin).toBe("http://localhost:3000");
   });
 });
 

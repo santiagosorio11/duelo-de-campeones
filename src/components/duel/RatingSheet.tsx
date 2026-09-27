@@ -1,6 +1,6 @@
 "use client";
 
-import { WarningCircleIcon } from "@phosphor-icons/react";
+import { PhoneIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import clsx from "clsx";
 import { useId, useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { submitRating, type PublicParticipant, type SubmitRatingResult } from "@/app/actions";
@@ -32,6 +32,7 @@ type Errors = Partial<Record<"stars" | "name" | "phone" | "consent" | "form", st
 
 const FIELD_FOR_CODE: Partial<Record<string, keyof Errors>> = {
   invalid_name: "name",
+  name_mismatch: "name",
   invalid_phone: "phone",
   junk_phone: "phone",
   consent_required: "consent",
@@ -119,7 +120,8 @@ function RatingForm({
         return;
       }
       if (res.code === "not_remembered") onForget();
-      const field = FIELD_FOR_CODE[res.code] ?? "form";
+      // Con identidad recordada no hay campos visibles: el error va al mensaje general.
+      const field = identity ? "form" : (FIELD_FOR_CODE[res.code] ?? "form");
       setErrors({ [field]: res.message });
     });
   };
@@ -163,7 +165,17 @@ function RatingForm({
             />
           </Field>
 
-          <Field id={`${ids}-phone`} label="Celular" helper="Si ganas, te llamamos a este número." error={errors.phone}>
+          <Field
+            id={`${ids}-phone`}
+            label="Celular"
+            helper={
+              <span className="flex items-start gap-2 rounded-[14px] bg-gold-400/10 px-3 py-2.5 text-xs leading-relaxed text-gold-200">
+                <PhoneIcon size={16} weight="duotone" className="mt-px shrink-0 text-gold-400" aria-hidden />
+                Usa un celular válido y activo: si ganas, te contactaremos a este número.
+              </span>
+            }
+            error={errors.phone}
+          >
             <div
               className={clsx(
                 "flex h-12 items-stretch overflow-hidden rounded-[14px] border bg-ink-850 transition focus-within:border-gold-400/70 focus-within:ring-2 focus-within:ring-gold-400/25",
@@ -223,19 +235,16 @@ function RatingForm({
         </p>
       ) : null}
 
-      <div className="space-y-3">
-        <button
-          type="submit"
-          disabled={pending}
-          className={clsx(
-            "relative w-full overflow-hidden rounded-full bg-gold-400 py-4 text-base font-semibold text-ink-950 transition active:scale-[0.99] disabled:cursor-wait",
-            pending && "pending-shimmer",
-          )}
-        >
-          {pending ? "Enviando…" : "Enviar calificación"}
-        </button>
-        <p className="text-center text-xs text-dim">Cada celular califica una vez cada plato.</p>
-      </div>
+      <button
+        type="submit"
+        disabled={pending}
+        className={clsx(
+          "relative w-full overflow-hidden rounded-full bg-gold-400 py-4 text-base font-semibold text-ink-950 transition active:scale-[0.99] disabled:cursor-wait",
+          pending && "pending-shimmer",
+        )}
+      >
+        {pending ? "Enviando…" : "Enviar calificación"}
+      </button>
     </form>
   );
 }
@@ -252,7 +261,7 @@ function Field({
 }: {
   id: string;
   label: string;
-  helper?: string;
+  helper?: ReactNode;
   error?: string;
   children: ReactNode;
 }) {
@@ -262,11 +271,7 @@ function Field({
         {label}
       </label>
       {children}
-      {helper ? (
-        <p id={`${id}-helper`} className="text-xs text-mist">
-          {helper}
-        </p>
-      ) : null}
+      {helper ? <div id={`${id}-helper`}>{helper}</div> : null}
       {error ? (
         <p id={`${id}-error`} className="text-sm text-danger">
           {error}
@@ -334,10 +339,14 @@ function StampView({
         <p className="mt-3 max-w-[36ch] text-sm leading-relaxed text-mist">
           {created
             ? raffleMessage(passport, catalog)
-            : `Este celular ya calificó este plato con ${stars} ${stars === 1 ? "estrella" : "estrellas"}. Solo cuenta una calificación por plato.`}
+            : `Ya calificaste este plato con ${stars} ${stars === 1 ? "estrella" : "estrellas"}. ${raffleMessage(passport, catalog)}`}
         </p>
         <div className="mt-6 w-full">
-          <PassportSlots catalog={catalog} passport={passport} highlight={created ? dish.slug : undefined} />
+          <PassportSlots
+            catalog={catalog}
+            passport={passport}
+            highlight={created ? catalog.find((r) => r.dishes.some((d) => d.slug === dish.slug))?.slug : undefined}
+          />
         </div>
       </div>
 

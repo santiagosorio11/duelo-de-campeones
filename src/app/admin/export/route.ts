@@ -20,7 +20,7 @@ export async function GET() {
     restaurant.dishes.map((dish) => ({ slug: dish.slug, label: `${restaurant.name} - ${dish.name}` })),
   );
 
-  const header = ["id", "nombre", "celular", ...dishes.map((d) => d.label), "platos", "en_sorteo", "oportunidades", "dispositivos", "registro"];
+  const header = ["id", "nombre", "celular", ...dishes.map((d) => d.label), "platos", "en_sorteo", "dispositivos", "registro"];
   const lines = rows.map((row) => {
     const passport = buildPassport(
       catalog,
@@ -33,7 +33,6 @@ export async function GET() {
       ...dishes.map((d) => row.stars[d.slug] ?? ""),
       passport.ratedCount,
       passport.eligible ? "si" : "no",
-      passport.tickets,
       row.devices,
       formatBogota(row.createdAt),
     ]

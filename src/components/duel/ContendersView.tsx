@@ -40,7 +40,6 @@ export function ContendersView({
   onOpenPassport,
 }: Props) {
   const pair = catalog.slice(0, 2);
-  const totalDishes = catalog.reduce((sum, r) => sum + r.dishes.length, 0);
 
   useGSAP(
     () => {
@@ -169,8 +168,8 @@ export function ContendersView({
         <Wordmark className="arena-wordmark text-[22px]" />
         <PassportChip
           className="arena-chip pointer-events-auto"
-          rated={passport?.ratedCount ?? 0}
-          total={totalDishes}
+          covered={passport?.restaurantsCovered ?? 0}
+          total={catalog.length}
           onOpen={onOpenPassport}
         />
       </header>

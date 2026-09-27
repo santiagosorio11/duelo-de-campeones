@@ -20,11 +20,14 @@ const baseCookie = {
 };
 
 // ---------------------------------------------------------------------------
-// Firma HMAC: el contenido es legible pero no se puede falsificar.
+// Firma HMAC: el contenido es legible pero no se puede falsificar. Cada tipo de
+// cookie firma con su propósito, así una nunca sirve en lugar de la otra.
 // ---------------------------------------------------------------------------
 
-function mac(data: string): string {
-  return createHmac("sha256", serverEnv().COOKIE_SECRET).update(data).digest("base64url");
+type Purpose = "participant" | "admin";
+
+function mac(purpose: Purpose, data: string): string {
+  return createHmac("sha256", serverEnv().COOKIE_SECRET).update(`${purpose}:${data}`).digest("base64url");
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -33,15 +36,15 @@ function safeEqual(a: string, b: string): boolean {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-function seal(payload: unknown): string {
+function seal(purpose: Purpose, payload: unknown): string {
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  return `${data}.${mac(data)}`;
+  return `${data}.${mac(purpose, data)}`;
 }
 
-function unseal(token: string | undefined): unknown {
-  if (!token) return null;
+function unseal(purpose: Purpose, token: string | undefined): unknown {
+  if (!token || token.length > 2048) return null;
   const [data, signature] = token.split(".");
-  if (!data || !signature || !safeEqual(signature, mac(data))) return null;
+  if (!data || !signature || !safeEqual(signature, mac(purpose, data))) return null;
   try {
     return JSON.parse(Buffer.from(data, "base64url").toString("utf8"));
   } catch {
@@ -61,12 +64,12 @@ const participantSchema = z.object({
 export type RememberedParticipant = z.infer<typeof participantSchema>;
 
 export async function readParticipant(): Promise<RememberedParticipant | null> {
-  const parsed = participantSchema.safeParse(unseal((await cookies()).get(PARTICIPANT_COOKIE)?.value));
+  const parsed = participantSchema.safeParse(unseal("participant", (await cookies()).get(PARTICIPANT_COOKIE)?.value));
   return parsed.success ? parsed.data : null;
 }
 
 export async function writeParticipant(participant: RememberedParticipant): Promise<void> {
-  (await cookies()).set(PARTICIPANT_COOKIE, seal(participant), { ...baseCookie, maxAge: PARTICIPANT_MAX_AGE });
+  (await cookies()).set(PARTICIPANT_COOKIE, seal("participant", participant), { ...baseCookie, maxAge: PARTICIPANT_MAX_AGE });
 }
 
 export async function clearParticipant(): Promise<void> {
@@ -109,7 +112,7 @@ export function checkAdminPassword(candidate: string): boolean {
 
 export async function startAdminSession(): Promise<void> {
   const exp = Date.now() + ADMIN_MAX_AGE * 1000;
-  (await cookies()).set(ADMIN_COOKIE, seal({ role: "admin", exp }), { ...baseCookie, sameSite: "strict", maxAge: ADMIN_MAX_AGE });
+  (await cookies()).set(ADMIN_COOKIE, seal("admin", { role: "admin", exp }), { ...baseCookie, sameSite: "strict", maxAge: ADMIN_MAX_AGE });
 }
 
 export async function endAdminSession(): Promise<void> {
@@ -117,6 +120,6 @@ export async function endAdminSession(): Promise<void> {
 }
 
 export async function isAdmin(): Promise<boolean> {
-  const parsed = adminSchema.safeParse(unseal((await cookies()).get(ADMIN_COOKIE)?.value));
+  const parsed = adminSchema.safeParse(unseal("admin", (await cookies()).get(ADMIN_COOKIE)?.value));
   return parsed.success && parsed.data.exp > Date.now();
 }

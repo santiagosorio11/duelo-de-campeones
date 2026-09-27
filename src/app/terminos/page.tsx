@@ -28,22 +28,27 @@ export default function TermsPage() {
       <ol>
         <li>Escanea el código QR en Machete Burger o en Coliseo.</li>
         <li>Califica de 1 a 5 estrellas la hamburguesa o el chuzo desgranado que probaste, con tu nombre y celular.</li>
-        <li>Cada celular puede calificar una sola vez cada plato, es decir, máximo 4 calificaciones.</li>
-        <li>Para entrar al sorteo debes calificar al menos un plato de cada restaurante.</li>
-        <li>Cada plato calificado es una oportunidad: puedes tener entre 2 y 4 oportunidades.</li>
+        <li>
+          Para entrar al sorteo debes calificar al menos un plato en cada restaurante. Todos los participantes tienen
+          la misma probabilidad de ganar, sin importar cuántos platos califiquen.
+        </li>
+        <li>Registra un celular válido y activo: es el único medio por el que contactaremos a los ganadores.</li>
       </ol>
 
       <h2>Premio</h2>
       <p>
-        Un mes de hamburguesas gratis: <mark>[cantidad, frecuencia, restaurante donde se redime y plazo para
-        redimirlo]</mark>. El premio es personal, intransferible y no se puede cambiar por dinero.
+        Un mes de hamburguesas gratis para 8 ganadores: 4 lo redimen en Machete Burger y 4 en Coliseo. Cada ganador
+        recibe 1 hamburguesa o 1 chuzo al día durante <mark>[fechas o plazo del mes de premio]</mark>, en el
+        restaurante que le corresponda. El premio no es acumulable (el día que no se redime se pierde), es personal,
+        intransferible y no se puede cambiar por dinero.
       </p>
 
       <h2>Sorteo y entrega</h2>
       <p>
-        El sorteo se realizará el <mark>[fecha]</mark> con un sistema de selección aleatoria en el que cada
-        oportunidad tiene la misma probabilidad. Contactaremos al ganador al celular registrado. Si el número no es
-        real, no corresponde a quien se registró o no responde en <mark>[48 horas]</mark>, se hará un nuevo sorteo.
+        El sorteo se realizará el <mark>[fecha]</mark> con un sistema de selección aleatoria entre todos los
+        participantes habilitados. Primero se eligen los ganadores de un restaurante y luego los del otro; una misma
+        persona no puede ganar dos veces. Contactaremos a cada ganador al celular registrado. Si el número no es real,
+        no corresponde a quien se registró o no responde en <mark>[48 horas]</mark>, se sorteará un reemplazo.
       </p>
 
       <h2>El campeón del duelo</h2>

@@ -3,13 +3,14 @@
 import { TicketIcon } from "@phosphor-icons/react";
 import clsx from "clsx";
 
+/** Sellos del pasaporte: restaurantes donde la persona ya calificó al menos un plato. */
 export function PassportChip({
-  rated,
+  covered,
   total,
   onOpen,
   className,
 }: {
-  rated: number;
+  covered: number;
   total: number;
   onOpen: () => void;
   className?: string;
@@ -27,9 +28,9 @@ export function PassportChip({
       <span>
         Pasaporte{" "}
         <span className="tabular-nums text-gold-300">
-          {rated}/{total}
+          {covered}/{total}
         </span>
-        <span className="sr-only"> platos calificados</span>
+        <span className="sr-only"> restaurantes sellados</span>
       </span>
     </button>
   );

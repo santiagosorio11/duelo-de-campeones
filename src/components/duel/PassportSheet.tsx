@@ -1,16 +1,17 @@
 "use client";
 
-import { SealCheckIcon, StackIcon, TicketIcon } from "@phosphor-icons/react";
+import { HamburgerIcon, PhoneIcon, SealCheckIcon, TrophyIcon } from "@phosphor-icons/react";
 import Link from "next/link";
 import type { PublicParticipant } from "@/app/actions";
 import { BottomSheet, useSheetClose } from "@/components/ui/BottomSheet";
-import { raffleMessage, type Passport, type Restaurant } from "@/lib/passport";
+import { prizeCopy, raffleMessage, type Passport, type Restaurant } from "@/lib/passport";
 import { PassportSlots } from "./PassportSlots";
 
 type Props = {
   catalog: Restaurant[];
   passport: Passport | null;
   identity: PublicParticipant | null;
+  winnersPerRestaurant: number;
   onForget: () => void;
   onClose: () => void;
 };
@@ -24,8 +25,9 @@ export function PassportSheet({ onClose, ...props }: Props) {
   );
 }
 
-function PassportContent({ catalog, passport, identity, onForget }: Omit<Props, "onClose">) {
+function PassportContent({ catalog, passport, identity, winnersPerRestaurant, onForget }: Omit<Props, "onClose">) {
   const close = useSheetClose();
+  const prize = prizeCopy(catalog, winnersPerRestaurant);
 
   return (
     <div className="px-5 pt-1">
@@ -38,21 +40,23 @@ function PassportContent({ catalog, passport, identity, onForget }: Omit<Props, 
         <PassportSlots catalog={catalog} passport={passport} />
       </div>
 
-      <ul className="mt-7 space-y-4 text-sm leading-relaxed">
-        <li className="flex gap-3">
-          <TicketIcon size={20} weight="duotone" className="mt-0.5 shrink-0 text-gold-400" aria-hidden />
-          <span>
-            <strong className="font-semibold">Premio: 1 mes de hamburguesas gratis.</strong>{" "}
-            <span className="text-mist">Participas al calificar al menos un plato de cada restaurante.</span>
-          </span>
-        </li>
-        <li className="flex gap-3">
-          <StackIcon size={20} weight="duotone" className="mt-0.5 shrink-0 text-gold-400" aria-hidden />
-          <span className="text-mist">Cada plato calificado es una oportunidad más: hasta 4.</span>
-        </li>
+      <h3 className="font-display mt-8 text-2xl leading-none uppercase text-gold">{prize.title}</h3>
+      <ul className="mt-4 space-y-4 text-sm leading-relaxed">
         <li className="flex gap-3">
           <SealCheckIcon size={20} weight="duotone" className="mt-0.5 shrink-0 text-gold-400" aria-hidden />
-          <span className="text-mist">Una calificación por celular en cada plato. Si ganas, te llamamos.</span>
+          <span className="text-mist">Participas si calificas al menos un plato en cada restaurante.</span>
+        </li>
+        <li className="flex gap-3">
+          <TrophyIcon size={20} weight="duotone" className="mt-0.5 shrink-0 text-gold-400" aria-hidden />
+          <span className="text-mist">{prize.winners}</span>
+        </li>
+        <li className="flex gap-3">
+          <HamburgerIcon size={20} weight="duotone" className="mt-0.5 shrink-0 text-gold-400" aria-hidden />
+          <span className="text-mist">{prize.detail}</span>
+        </li>
+        <li className="flex gap-3">
+          <PhoneIcon size={20} weight="duotone" className="mt-0.5 shrink-0 text-gold-400" aria-hidden />
+          <span className="text-mist">Si ganas, te contactamos al celular que registraste. Usa un número válido.</span>
         </li>
       </ul>
 

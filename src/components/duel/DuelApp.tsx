@@ -16,6 +16,7 @@ export type CampaignView = {
   state: "open" | "upcoming" | "closed";
   /** Fecha de apertura ya formateada en el servidor (solo si state = upcoming). */
   opensAtLabel: string | null;
+  winnersPerRestaurant: number;
 };
 
 type Props = {
@@ -49,7 +50,6 @@ export function DuelApp({ catalog, campaign, entrySlug, remembered, initialPassp
   const identity = identityState === undefined ? remembered : identityState;
   const passport = passportState === undefined ? initialPassport : passportState;
   const votingOpen = campaign.state === "open";
-  const totalDishes = catalog.reduce((sum, r) => sum + r.dishes.length, 0);
   const standings = results ? overallStandings(results) : null;
   const champion = standings ? leader(standings) : null;
 
@@ -217,7 +217,7 @@ export function DuelApp({ catalog, campaign, entrySlug, remembered, initialPassp
               restaurant={selected}
               other={other}
               passport={passport}
-              totalDishes={totalDishes}
+              totalRestaurants={catalog.length}
               votingOpen={votingOpen}
               instruction={instruction}
               results={results}
@@ -274,6 +274,7 @@ export function DuelApp({ catalog, campaign, entrySlug, remembered, initialPassp
           catalog={catalog}
           passport={passport}
           identity={identity}
+          winnersPerRestaurant={campaign.winnersPerRestaurant}
           onForget={handleForget}
           onClose={() => setPassportOpen(false)}
         />

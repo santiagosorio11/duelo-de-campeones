@@ -13,7 +13,7 @@ type Props = {
   restaurant: Restaurant;
   other: Restaurant | undefined;
   passport: Passport | null;
-  totalDishes: number;
+  totalRestaurants: number;
   votingOpen: boolean;
   instruction: string;
   results: DishResult[] | null;
@@ -29,7 +29,7 @@ export function VoteView({
   restaurant,
   other,
   passport,
-  totalDishes,
+  totalRestaurants,
   votingOpen,
   instruction,
   results,
@@ -69,7 +69,7 @@ export function VoteView({
           <ArrowLeftIcon size={18} aria-hidden />
           Contrincantes
         </button>
-        <PassportChip rated={passport?.ratedCount ?? 0} total={totalDishes} onOpen={onOpenPassport} />
+        <PassportChip covered={passport?.restaurantsCovered ?? 0} total={totalRestaurants} onOpen={onOpenPassport} />
       </header>
 
       <div className="vote-title mt-8">

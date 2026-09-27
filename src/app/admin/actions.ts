@@ -1,22 +1,43 @@
 "use server";
 
-import { randomInt } from "node:crypto";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { getRaffleEntries } from "@/lib/admin";
-import { pickWeighted, totalTickets } from "@/lib/raffle";
-import { checkAdminPassword, endAdminSession, isAdmin, startAdminSession } from "@/lib/session";
+import { CACHE_TAGS } from "@/lib/catalog";
+import { checkAdminPassword, endAdminSession, isAdmin, requestFingerprint, startAdminSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { bogotaLocalToIso } from "@/lib/time";
 
 export type AdminActionState = { ok: boolean; message: string } | null;
 
+const LOGIN_WINDOW_SECONDS = 15 * 60;
+
 async function requireAdmin(): Promise<void> {
   if (!(await isAdmin())) redirect("/admin/login");
 }
 
+/** Máximo 5 intentos por IP y 100 en total cada 15 minutos. Si la base no responde, no deja pasar. */
+async function loginAllowed(): Promise<boolean> {
+  const { ipHash } = await requestFingerprint();
+  const buckets: [string, number][] = [["login:global", 100]];
+  if (ipHash) buckets.push([`login:ip:${ipHash}`, 5]);
+
+  for (const [bucket, limit] of buckets) {
+    const { data, error } = await supabaseAdmin().rpc("hit_rate_limit", {
+      p_bucket: bucket,
+      p_limit: limit,
+      p_window_seconds: LOGIN_WINDOW_SECONDS,
+    });
+    if (error || data !== true) return false;
+  }
+  return true;
+}
+
 export async function login(_prev: AdminActionState, formData: FormData): Promise<AdminActionState> {
+  if (!(await loginAllowed())) {
+    return { ok: false, message: "Demasiados intentos. Espera 15 minutos e inténtalo de nuevo." };
+  }
+
   const password = String(formData.get("password") ?? "");
   if (!password || !checkAdminPassword(password)) {
     // Pequeña pausa para frenar intentos automáticos.
@@ -72,39 +93,28 @@ export async function updateCampaign(_prev: AdminActionState, formData: FormData
 
   if (error) return { ok: false, message: `No se pudo guardar: ${error.message}` };
 
-  revalidatePath("/");
+  // La página pública ve el cambio de inmediato (sin esperar la caché).
+  updateTag(CACHE_TAGS.campaign);
+  updateTag(CACHE_TAGS.results);
   revalidatePath("/admin");
   return { ok: true, message: "Campaña actualizada." };
 }
 
-export async function drawWinner(): Promise<AdminActionState> {
+/**
+ * Sortea los ganadores que falten para un restaurante. La base de datos hace el
+ * sorteo de forma atómica: nadie gana dos veces y no se supera el cupo.
+ */
+export async function drawWinners(restaurantSlug: string): Promise<AdminActionState> {
   await requireAdmin();
 
-  const { data: draws, error: drawsError } = await supabaseAdmin().from("raffle_draws").select("participant_id, status");
-  if (drawsError) return { ok: false, message: drawsError.message };
-  if (draws.some((draw) => draw.status === "pending")) {
-    return { ok: false, message: "Primero confirma o descarta el ganador pendiente." };
-  }
-  if (draws.some((draw) => draw.status === "confirmed")) {
-    return { ok: false, message: "Ya hay un ganador confirmado." };
-  }
-
-  // Quien ya salió sorteado (y fue descartado) no vuelve a participar.
-  const excluded = new Set(draws.map((draw) => draw.participant_id));
-  const pool = (await getRaffleEntries()).filter((entry) => !excluded.has(entry.participantId) && entry.tickets > 0);
-  const winner = pickWeighted(pool, (max) => randomInt(max));
-  if (!winner) return { ok: false, message: "No hay participantes habilitados para el sorteo." };
-
-  const { error } = await supabaseAdmin().from("raffle_draws").insert({
-    participant_id: winner.participantId,
-    tickets: winner.tickets,
-    total_tickets: totalTickets(pool),
-    pool_size: pool.length,
-  });
-  if (error) return { ok: false, message: error.message };
+  const { data: drawn, error } = await supabaseAdmin().rpc("draw_raffle_winners", { p_restaurant_slug: restaurantSlug });
+  if (error) return { ok: false, message: `No se pudo sortear: ${error.message}` };
 
   revalidatePath("/admin");
-  return { ok: true, message: `Ganador sorteado entre ${pool.length} participantes.` };
+  if (drawn === 0) {
+    return { ok: false, message: "No hay más participantes disponibles o el cupo ya está completo." };
+  }
+  return { ok: true, message: drawn === 1 ? "Salió 1 ganador." : `Salieron ${drawn} ganadores.` };
 }
 
 export async function resolveDraw(formData: FormData): Promise<void> {

@@ -21,7 +21,7 @@ export type RaffleEntryRow = {
   participantId: number;
   fullName: string;
   phone: string;
-  tickets: number;
+  dishesRated: number;
   firstRatingAt: string | null;
 };
 
@@ -29,8 +29,8 @@ export async function getRaffleEntries(): Promise<RaffleEntryRow[]> {
   const rows = await fetchAll((from, to) =>
     supabaseAdmin()
       .from("raffle_entries")
-      .select("participant_id, full_name, phone_e164, tickets, first_rating_at")
-      .order("tickets", { ascending: false })
+      .select("participant_id, full_name, phone_e164, dishes_rated, first_rating_at")
+      .order("first_rating_at")
       .order("participant_id")
       .range(from, to),
   );
@@ -38,7 +38,7 @@ export async function getRaffleEntries(): Promise<RaffleEntryRow[]> {
     participantId: row.participant_id ?? 0,
     fullName: row.full_name ?? "",
     phone: row.phone_e164 ?? "",
-    tickets: row.tickets ?? 0,
+    dishesRated: row.dishes_rated ?? 0,
     firstRatingAt: row.first_rating_at,
   }));
 }
@@ -48,8 +48,8 @@ export type DrawRow = {
   participantId: number;
   fullName: string;
   phone: string;
-  tickets: number;
-  totalTickets: number;
+  /** Restaurante donde redime el premio. */
+  restaurantSlug: string;
   poolSize: number;
   status: "pending" | "confirmed" | "rejected";
   drawnAt: string;
@@ -58,16 +58,18 @@ export type DrawRow = {
 export async function getDraws(): Promise<DrawRow[]> {
   const { data, error } = await supabaseAdmin()
     .from("raffle_draws")
-    .select("id, participant_id, tickets, total_tickets, pool_size, status, drawn_at, participants(full_name, phone_e164)")
-    .order("drawn_at", { ascending: false });
+    .select(
+      "id, participant_id, pool_size, status, drawn_at, participants(full_name, phone_e164), restaurants(slug)",
+    )
+    .order("drawn_at")
+    .order("id");
   if (error) throw new Error(error.message);
   return data.map((row) => ({
     id: row.id,
     participantId: row.participant_id,
     fullName: row.participants.full_name,
     phone: row.participants.phone_e164,
-    tickets: row.tickets,
-    totalTickets: row.total_tickets,
+    restaurantSlug: row.restaurants.slug,
     poolSize: row.pool_size,
     status: row.status as DrawRow["status"],
     drawnAt: row.drawn_at,

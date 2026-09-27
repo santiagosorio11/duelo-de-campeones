@@ -7,23 +7,24 @@ import QRCode from "qrcode";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { getCatalog } from "@/lib/catalog";
 import { isAdmin } from "@/lib/session";
+import { siteUrl } from "@/lib/site";
 import { PrintButton } from "./PrintButton";
 
 export const metadata: Metadata = { title: "QR de mesas | Duelo de Campeones" };
 
-async function siteUrl(): Promise<string> {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
-  if (configured) return configured;
+/** Base de los QR: la URL configurada o de Vercel; en local, el host de la petición. */
+async function qrBaseUrl(): Promise<string> {
+  const configured = siteUrl();
+  if (configured.hostname !== "localhost") return configured.origin;
   const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const protocol = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  return `${protocol}://${host}`;
+  const host = h.get("host") ?? "localhost:3000";
+  return `http://${host}`;
 }
 
 export default async function QrPage() {
   if (!(await isAdmin())) redirect("/admin/login");
 
-  const [catalog, base] = await Promise.all([getCatalog(), siteUrl()]);
+  const [catalog, base] = await Promise.all([getCatalog(), qrBaseUrl()]);
   const isLocal = /localhost|127\.0\.0\.1/.test(base);
 
   const items = await Promise.all(

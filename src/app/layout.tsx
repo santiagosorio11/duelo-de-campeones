@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Anton, Geist } from "next/font/google";
+import { siteUrl } from "@/lib/site";
 import "./globals.css";
 
 const geist = Geist({
@@ -14,10 +15,10 @@ const anton = Anton({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  metadataBase: siteUrl(),
   title: "Duelo de Campeones | Machete Burger vs Coliseo",
   description:
-    "Califica la hamburguesa y el chuzo desgranado de Machete Burger y Coliseo. Prueba un plato de cada uno y participa por 1 mes de hamburguesas gratis.",
+    "Califica la hamburguesa y el chuzo desgranado de Machete Burger y Coliseo. Prueba un plato en cada uno y participa por 1 mes de hamburguesas gratis.",
   robots: { index: false, follow: false },
 };
 

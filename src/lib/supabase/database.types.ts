@@ -135,10 +135,9 @@ export type Database = {
           notes: string | null
           participant_id: number
           pool_size: number
+          prize_restaurant_id: number
           resolved_at: string | null
           status: string
-          tickets: number
-          total_tickets: number
         }
         Insert: {
           drawn_at?: string
@@ -146,10 +145,9 @@ export type Database = {
           notes?: string | null
           participant_id: number
           pool_size: number
+          prize_restaurant_id: number
           resolved_at?: string | null
           status?: string
-          tickets: number
-          total_tickets: number
         }
         Update: {
           drawn_at?: string
@@ -157,10 +155,9 @@ export type Database = {
           notes?: string | null
           participant_id?: number
           pool_size?: number
+          prize_restaurant_id?: number
           resolved_at?: string | null
           status?: string
-          tickets?: number
-          total_tickets?: number
         }
         Relationships: [
           {
@@ -177,7 +174,39 @@ export type Database = {
             referencedRelation: "raffle_entries"
             referencedColumns: ["participant_id"]
           },
+          {
+            foreignKeyName: "raffle_draws_prize_restaurant_id_fkey"
+            columns: ["prize_restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "dish_results"
+            referencedColumns: ["restaurant_id"]
+          },
+          {
+            foreignKeyName: "raffle_draws_prize_restaurant_id_fkey"
+            columns: ["prize_restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      rate_limits: {
+        Row: {
+          bucket: string
+          hits: number
+          window_start: string
+        }
+        Insert: {
+          bucket: string
+          hits?: number
+          window_start: string
+        }
+        Update: {
+          bucket?: string
+          hits?: number
+          window_start?: string
+        }
+        Relationships: []
       }
       ratings: {
         Row: {
@@ -314,18 +343,27 @@ export type Database = {
       }
       raffle_entries: {
         Row: {
+          dishes_rated: number | null
           first_rating_at: string | null
           full_name: string | null
           last_rating_at: string | null
           participant_id: number | null
           phone_e164: string | null
           restaurants_covered: number | null
-          tickets: number | null
         }
         Relationships: []
       }
     }
     Functions: {
+      draw_raffle_winners: {
+        Args: { p_restaurant_slug: string }
+        Returns: number
+      }
+      hit_rate_limit: {
+        Args: { p_bucket: string; p_limit: number; p_window_seconds: number }
+        Returns: boolean
+      }
+      normalize_name: { Args: { p_name: string }; Returns: string }
       submit_rating: {
         Args: {
           p_consent_version: string
