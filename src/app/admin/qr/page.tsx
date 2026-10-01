@@ -30,13 +30,22 @@ export default async function QrPage() {
   const items = await Promise.all(
     catalog.map(async (restaurant) => {
       const url = `${base}/?r=${restaurant.slug}`;
-      const svg = await QRCode.toString(url, {
-        type: "svg",
-        margin: 1,
-        errorCorrectionLevel: "M",
-        color: { dark: "#07070a", light: "#ffffff" },
-      });
-      return { restaurant, url, svg };
+      const [svg, png] = await Promise.all([
+        QRCode.toString(url, {
+          type: "svg",
+          margin: 1,
+          errorCorrectionLevel: "M",
+          color: { dark: "#07070a", light: "#ffffff" },
+        }),
+        QRCode.toDataURL(url, {
+          type: "image/png",
+          width: 1200,
+          margin: 4,
+          errorCorrectionLevel: "M",
+          color: { dark: "#07070a", light: "#ffffff" },
+        }),
+      ]);
+      return { restaurant, url, svg, png };
     }),
   );
 
@@ -63,7 +72,7 @@ export default async function QrPage() {
       </p>
 
       <div className="mt-8 grid gap-6 sm:grid-cols-2 print:mt-0 print:gap-0">
-        {items.map(({ restaurant, url, svg }) => (
+        {items.map(({ restaurant, url, svg, png }) => (
           <article
             key={restaurant.slug}
             className="flex flex-col items-center gap-5 rounded-[24px] bg-[#fbfaf7] p-8 text-center text-ink-950 print:min-h-[50vh] print:break-inside-avoid print:rounded-none"
@@ -81,11 +90,11 @@ export default async function QrPage() {
               <p className="mt-2 text-sm">Escanea, califica los platos y participa por 1 mes de hamburguesas gratis.</p>
             </div>
             <a
-              href={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`}
-              download={`qr-${restaurant.slug}.svg`}
+              href={png}
+              download={`qr-${restaurant.slug}.png`}
               className="text-xs text-ink-700 underline underline-offset-4 print:hidden"
             >
-              Descargar SVG ({url})
+              Descargar PNG ({url})
             </a>
           </article>
         ))}
