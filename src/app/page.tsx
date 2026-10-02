@@ -1,5 +1,5 @@
 import { DuelApp, type CampaignView } from "@/components/duel/DuelApp";
-import { getCampaign, getCatalog, getPublishedResults, getRatingsForPhone, type CampaignState } from "@/lib/catalog";
+import { getCampaign, getCatalog, getRatingsForPhone, type CampaignState } from "@/lib/catalog";
 import { buildPassport } from "@/lib/passport";
 import { maskPhone } from "@/lib/phone-format";
 import { readParticipant } from "@/lib/session";
@@ -25,8 +25,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const [catalog, campaign, participant] = await Promise.all([getCatalog(), getCampaign(), readParticipant()]);
 
   const passport = participant ? buildPassport(catalog, await getRatingsForPhone(participant.phone)) : null;
-  // Los resultados solo salen del servidor cuando el admin los publica.
-  const results = campaign.resultsPublished ? await getPublishedResults() : null;
   const entrySlug = typeof params.r === "string" && catalog.some((r) => r.slug === params.r) ? params.r : null;
 
   return (
@@ -36,7 +34,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       entrySlug={entrySlug}
       remembered={participant ? { name: participant.name, phoneMasked: maskPhone(participant.phone) } : null}
       initialPassport={passport}
-      results={results}
       skipIntro={params.skipIntro === "1"}
     />
   );

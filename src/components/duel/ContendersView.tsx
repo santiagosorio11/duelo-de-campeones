@@ -1,13 +1,12 @@
 "use client";
 
-import { ArrowRightIcon, TrophyIcon } from "@phosphor-icons/react";
+import { ArrowRightIcon } from "@phosphor-icons/react";
 import clsx from "clsx";
 import type { RefObject } from "react";
 import { VsBadge } from "@/components/brand/VsBadge";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { gsap, prefersReducedMotion, useGSAP } from "@/lib/gsap";
 import type { Passport, Restaurant } from "@/lib/passport";
-import type { Standing } from "@/lib/results";
 import { PassportChip } from "./PassportChip";
 import { RestaurantMark } from "./RestaurantMark";
 
@@ -16,9 +15,6 @@ type Props = {
   passport: Passport | null;
   entrySlug: string | null;
   hint: string;
-  /** Tabla general publicada (solo al cierre): muestra promedio y campeón. */
-  standings: Standing[] | null;
-  championSlug: string | null;
   /** Anima la entrada al volver desde la vista de votación. */
   animateIn: boolean;
   rootRef: RefObject<HTMLElement | null>;
@@ -32,8 +28,6 @@ export function ContendersView({
   passport,
   entrySlug,
   hint,
-  standings,
-  championSlug,
   animateIn,
   rootRef,
   onSelect,
@@ -78,14 +72,9 @@ export function ContendersView({
       {pair.map((restaurant, index) => {
         const first = index === 0;
         const stamped = restaurant.dishes.filter((dish) => passport?.stamps[dish.slug]).length;
-        const standing = standings?.find((s) => s.restaurantSlug === restaurant.slug);
-        const meta = standing
-          ? standing.avgStars === null
-            ? "Sin votos"
-            : `${standing.avgStars.toFixed(1).replace(".", ",")} de 5 en promedio`
-          : passport
-            ? `${stamped} de ${restaurant.dishes.length} platos calificados`
-            : "Hamburguesa y chuzo desgranado";
+        const meta = passport
+          ? `${stamped} de ${restaurant.dishes.length} platos calificados`
+          : "Hamburguesa y chuzo desgranado";
 
         return (
           <button
@@ -112,12 +101,7 @@ export function ContendersView({
                   : "right-6 bottom-[12%] left-6 items-end landscape:top-1/2 landscape:bottom-auto landscape:left-[54%] landscape:-translate-y-1/2",
               )}
             >
-              {championSlug === restaurant.slug ? (
-                <span className="contender-tag mb-4 inline-flex items-center gap-1.5 rounded-full bg-gold-400 px-3 py-1 text-xs font-semibold text-ink-950">
-                  <TrophyIcon size={14} weight="fill" aria-hidden />
-                  Campeón
-                </span>
-              ) : entrySlug === restaurant.slug ? (
+              {entrySlug === restaurant.slug ? (
                 <span className="contender-tag mb-4 rounded-full border border-gold-400/45 bg-ink-950/40 px-3 py-1 text-xs text-gold-300">
                   Estás aquí
                 </span>

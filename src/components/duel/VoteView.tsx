@@ -4,7 +4,6 @@ import { ArrowLeftIcon, ArrowRightIcon } from "@phosphor-icons/react";
 import type { RefObject } from "react";
 import { gsap, prefersReducedMotion, useGSAP } from "@/lib/gsap";
 import type { Passport, Restaurant } from "@/lib/passport";
-import type { DishResult } from "@/lib/results";
 import { DishCard } from "./DishCard";
 import { PassportChip } from "./PassportChip";
 import { RestaurantMark } from "./RestaurantMark";
@@ -16,7 +15,6 @@ type Props = {
   totalRestaurants: number;
   votingOpen: boolean;
   instruction: string;
-  results: DishResult[] | null;
   rootRef: RefObject<HTMLElement | null>;
   onBack: () => void;
   onSwitch: (slug: string) => void;
@@ -32,7 +30,6 @@ export function VoteView({
   totalRestaurants,
   votingOpen,
   instruction,
-  results,
   rootRef,
   onBack,
   onSwitch,
@@ -88,7 +85,6 @@ export function VoteView({
               restaurant={restaurant}
               stars={passport?.stamps[dish.slug]}
               votingOpen={votingOpen}
-              result={results?.find((row) => row.dishSlug === dish.slug)}
               priority={index === 0}
               onOpen={() => onOpenDish(dish.slug)}
             />

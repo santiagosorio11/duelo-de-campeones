@@ -6,7 +6,6 @@ import { forgetParticipant, type PublicParticipant } from "@/app/actions";
 import { IntroSequence } from "@/components/intro/IntroSequence";
 import { gsap, prefersReducedMotion, useGSAP } from "@/lib/gsap";
 import type { Passport, Restaurant } from "@/lib/passport";
-import { leader, overallStandings, type DishResult } from "@/lib/results";
 import { ContendersView } from "./ContendersView";
 import { PassportSheet } from "./PassportSheet";
 import { RatingSheet, type RatedResult } from "./RatingSheet";
@@ -25,7 +24,6 @@ type Props = {
   entrySlug: string | null;
   remembered: PublicParticipant | null;
   initialPassport: Passport | null;
-  results: DishResult[] | null;
   skipIntro: boolean;
 };
 
@@ -37,7 +35,7 @@ function voteSlugFromHistory(): string | null {
   return typeof state?.dcVote === "string" ? state.dcVote : null;
 }
 
-export function DuelApp({ catalog, campaign, entrySlug, remembered, initialPassport, results, skipIntro }: Props) {
+export function DuelApp({ catalog, campaign, entrySlug, remembered, initialPassport, skipIntro }: Props) {
   const [phase, setPhase] = useState<Phase>(skipIntro ? "ready" : "intro");
   const [view, setView] = useState<View>({ name: "contenders" });
   const [returning, setReturning] = useState(false);
@@ -50,8 +48,6 @@ export function DuelApp({ catalog, campaign, entrySlug, remembered, initialPassp
   const identity = identityState === undefined ? remembered : identityState;
   const passport = passportState === undefined ? initialPassport : passportState;
   const votingOpen = campaign.state === "open";
-  const standings = results ? overallStandings(results) : null;
-  const champion = standings ? leader(standings) : null;
 
   const appRef = useRef<HTMLDivElement>(null);
   const contendersRef = useRef<HTMLElement>(null);
@@ -64,9 +60,7 @@ export function DuelApp({ catalog, campaign, entrySlug, remembered, initialPassp
       ? "Elige una esquina y califica sus platos"
       : campaign.state === "upcoming"
         ? `La votación abre el ${campaign.opensAtLabel ?? "pronto"}`
-        : results
-          ? "Así terminó el duelo"
-          : "La votación cerró. Pronto anunciamos al campeón.";
+        : "La votación está cerrada.";
 
   const instruction =
     campaign.state === "open"
@@ -220,7 +214,6 @@ export function DuelApp({ catalog, campaign, entrySlug, remembered, initialPassp
               totalRestaurants={catalog.length}
               votingOpen={votingOpen}
               instruction={instruction}
-              results={results}
               rootRef={voteRef}
               onBack={goBack}
               onSwitch={switchRestaurant}
@@ -234,8 +227,6 @@ export function DuelApp({ catalog, campaign, entrySlug, remembered, initialPassp
             passport={passport}
             entrySlug={entrySlug}
             hint={hint}
-            standings={standings}
-            championSlug={champion?.restaurantSlug ?? null}
             animateIn={returning}
             rootRef={contendersRef}
             onSelect={(slug) => selectRestaurant(slug)}
