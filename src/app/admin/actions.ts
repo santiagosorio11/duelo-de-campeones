@@ -1,9 +1,11 @@
 "use server";
 
+import { randomInt } from "node:crypto";
 import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { CACHE_TAGS } from "@/lib/catalog";
+import { getRaffleEntries } from "@/lib/admin";
 import { checkAdminPassword, endAdminSession, isAdmin, requestFingerprint, startAdminSession } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { bogotaLocalToIso } from "@/lib/time";
@@ -100,21 +102,53 @@ export async function updateCampaign(_prev: AdminActionState, formData: FormData
   return { ok: true, message: "Campaña actualizada." };
 }
 
-/**
- * Sortea los ganadores que falten para un restaurante. La base de datos hace el
- * sorteo de forma atómica: nadie gana dos veces y no se supera el cupo.
- */
+/** Sortea una persona. La base evita duplicados y respeta el cupo del restaurante. */
 export async function drawWinners(restaurantSlug: string): Promise<AdminActionState> {
   await requireAdmin();
 
-  const { data: drawn, error } = await supabaseAdmin().rpc("draw_raffle_winners", { p_restaurant_slug: restaurantSlug });
+  const parsedSlug = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).safeParse(restaurantSlug);
+  if (!parsedSlug.success) return { ok: false, message: "Restaurante inválido." };
+
+  const [{ data: restaurant, error: restaurantError }, { data: campaign, error: campaignError }, entries] =
+    await Promise.all([
+      supabaseAdmin().from("restaurants").select("id").eq("slug", parsedSlug.data).maybeSingle(),
+      supabaseAdmin().from("campaign").select("winners_per_restaurant").eq("id", true).single(),
+      getRaffleEntries(),
+    ]);
+
+  if (restaurantError || !restaurant) {
+    return { ok: false, message: `No se pudo sortear: ${restaurantError?.message ?? "restaurante desconocido"}` };
+  }
+  if (campaignError) return { ok: false, message: `No se pudo sortear: ${campaignError.message}` };
+
+  const { data: existingDraws, error: drawsError } = await supabaseAdmin()
+    .from("raffle_draws")
+    .select("participant_id, prize_restaurant_id, status");
+  if (drawsError) return { ok: false, message: `No se pudo sortear: ${drawsError.message}` };
+
+  const activeForRestaurant = existingDraws.filter(
+    (draw) => draw.prize_restaurant_id === restaurant.id && draw.status !== "rejected",
+  ).length;
+  if (activeForRestaurant >= campaign.winners_per_restaurant) {
+    return { ok: false, message: "El cupo de este restaurante ya está completo." };
+  }
+
+  const alreadyDrawn = new Set(existingDraws.map((draw) => draw.participant_id));
+  const available = entries.filter((entry) => !alreadyDrawn.has(entry.participantId));
+  if (available.length === 0) {
+    return { ok: false, message: "No hay más participantes disponibles." };
+  }
+
+  const winner = available[randomInt(available.length)];
+  const { error } = await supabaseAdmin().from("raffle_draws").insert({
+    participant_id: winner.participantId,
+    prize_restaurant_id: restaurant.id,
+    pool_size: available.length,
+  });
   if (error) return { ok: false, message: `No se pudo sortear: ${error.message}` };
 
   revalidatePath("/admin");
-  if (drawn === 0) {
-    return { ok: false, message: "No hay más participantes disponibles o el cupo ya está completo." };
-  }
-  return { ok: true, message: drawn === 1 ? "Salió 1 ganador." : `Salieron ${drawn} ganadores.` };
+  return { ok: true, message: "Salió 1 ganador." };
 }
 
 export async function resolveDraw(formData: FormData): Promise<void> {

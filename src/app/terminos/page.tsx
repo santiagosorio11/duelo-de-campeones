@@ -37,7 +37,7 @@ export default function TermsPage() {
 
       <h2>Premio</h2>
       <p>
-        Un mes de hamburguesas gratis para 8 ganadores: 4 lo redimen en Machete Burger y 4 en Coliseo. Cada ganador
+        Un mes de hamburguesas gratis para 4 ganadores: 2 lo redimen en Machete Burger y 2 en Coliseo. Cada ganador
         recibe 1 hamburguesa o 1 chuzo al día durante <mark>[fechas o plazo del mes de premio]</mark>, en el
         restaurante que le corresponda. El premio no es acumulable (el día que no se redime se pierde), es personal,
         intransferible y no se puede cambiar por dinero.
@@ -46,7 +46,7 @@ export default function TermsPage() {
       <h2>Sorteo y entrega</h2>
       <p>
         El sorteo se realizará el <mark>[fecha]</mark> con un sistema de selección aleatoria entre todos los
-        participantes habilitados. Primero se eligen los ganadores de un restaurante y luego los del otro; una misma
+        participantes habilitados. Cada ejecución elige una sola persona para el restaurante seleccionado; una misma
         persona no puede ganar dos veces. Contactaremos a cada ganador al celular registrado. Si el número no es real,
         no corresponde a quien se registró o no responde en <mark>[48 horas]</mark>, se sorteará un reemplazo.
       </p>

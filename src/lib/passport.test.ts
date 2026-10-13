@@ -83,10 +83,10 @@ describe("raffleMessage", () => {
 });
 
 describe("prizeCopy", () => {
-  it("describe 4 ganadores por restaurante", () => {
-    expect(prizeCopy(catalog, 4)).toEqual({
+  it("describe 2 ganadores por restaurante", () => {
+    expect(prizeCopy(catalog, 2)).toEqual({
       title: "1 mes de hamburguesas gratis",
-      winners: "8 ganadores: 4 en Machete Burger y 4 en Coliseo.",
+      winners: "4 ganadores: 2 en Machete Burger y 2 en Coliseo.",
       detail: "Cada ganador recibe 1 hamburguesa o 1 chuzo al día. No es acumulable ni transferible.",
     });
   });

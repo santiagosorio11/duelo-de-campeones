@@ -1,5 +1,6 @@
 import "server-only";
 import { getCampaign, getCatalog, getDishResults } from "@/lib/catalog";
+import { hasExcludedRafflePattern, type RaffleRating } from "@/lib/raffle";
 import { supabaseAdmin } from "@/lib/supabase/server";
 
 const PAGE_SIZE = 1000;
@@ -26,21 +27,40 @@ export type RaffleEntryRow = {
 };
 
 export async function getRaffleEntries(): Promise<RaffleEntryRow[]> {
-  const rows = await fetchAll((from, to) =>
-    supabaseAdmin()
-      .from("raffle_entries")
-      .select("participant_id, full_name, phone_e164, dishes_rated, first_rating_at")
-      .order("first_rating_at")
-      .order("participant_id")
-      .range(from, to),
-  );
-  return rows.map((row) => ({
-    participantId: row.participant_id ?? 0,
-    fullName: row.full_name ?? "",
-    phone: row.phone_e164 ?? "",
-    dishesRated: row.dishes_rated ?? 0,
-    firstRatingAt: row.first_rating_at,
-  }));
+  const [rows, ratings] = await Promise.all([
+    fetchAll((from, to) =>
+      supabaseAdmin()
+        .from("raffle_entries")
+        .select("participant_id, full_name, phone_e164, dishes_rated, first_rating_at")
+        .order("first_rating_at")
+        .order("participant_id")
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabaseAdmin()
+        .from("ratings")
+        .select("participant_id, stars, dishes(restaurant_id)")
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+
+  const ratingsByParticipant = new Map<number, RaffleRating[]>();
+  for (const rating of ratings) {
+    const participantRatings = ratingsByParticipant.get(rating.participant_id) ?? [];
+    participantRatings.push({ restaurantId: rating.dishes.restaurant_id, stars: rating.stars });
+    ratingsByParticipant.set(rating.participant_id, participantRatings);
+  }
+
+  return rows
+    .filter((row) => !hasExcludedRafflePattern(ratingsByParticipant.get(row.participant_id ?? 0) ?? []))
+    .map((row) => ({
+      participantId: row.participant_id ?? 0,
+      fullName: row.full_name ?? "",
+      phone: row.phone_e164 ?? "",
+      dishesRated: row.dishes_rated ?? 0,
+      firstRatingAt: row.first_rating_at,
+    }));
 }
 
 export type DrawRow = {

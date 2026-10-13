@@ -82,7 +82,7 @@ export const getCampaign = cache(async (): Promise<CampaignState> => {
     resultsPublished: data?.results_published ?? false,
     startsAt: data?.starts_at ?? null,
     endsAt: data?.ends_at ?? null,
-    winnersPerRestaurant: data?.winners_per_restaurant ?? 4,
+    winnersPerRestaurant: data?.winners_per_restaurant ?? 2,
   };
 });
 

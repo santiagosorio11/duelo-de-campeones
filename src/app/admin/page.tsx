@@ -98,7 +98,8 @@ export default async function AdminPage() {
 
       <Section title="Sorteo">
         <p className="mb-5 max-w-[70ch] text-sm leading-relaxed text-mist">
-          Participan quienes calificaron al menos un plato en cada restaurante, todos con la misma probabilidad.{" "}
+          Participan quienes calificaron al menos un plato en cada restaurante, salvo perfiles extremos 5-5 / 1-1 o
+          5-5 / 2-2. Todos los elegibles tienen la misma probabilidad. El sorteo se realiza de uno en uno. {" "}
           {prize.winners} {prize.detail} Llama a cada ganador: si el número no es real o no responde, márcalo como no
           válido y sortea un reemplazo.
         </p>
@@ -339,7 +340,6 @@ function RafflePanel({
           <DrawButton
             restaurantSlug={restaurant.slug}
             restaurantName={restaurant.name}
-            missing={missing}
             votingOpen={votingOpen}
           />
         )}
